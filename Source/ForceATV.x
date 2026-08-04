@@ -19,15 +19,23 @@
 - (NSInteger)userContentMode;
 @end
 
+@interface YTMAVSwitch : UIView
+- (void)setUserContentMode:(NSInteger)contentMode;
+- (void)setUserContentMode:(NSInteger)contentMode animated:(BOOL)animated;
+- (NSInteger)userContentMode;
+- (void)didTap:(id)sender;
+@property (nonatomic, retain) NSString *audioLabel;
+@property (nonatomic, retain) NSString *videoLabel;
+@end
+
 @interface YTPlayerViewController : UIViewController
 - (NSString *)contentVideoID;
 - (void)playbackController:(id)controller didActivateNewPlaybackWithContentVideo:(id)video;
-- (void)playbackController:(id)controller willActivateVideo:(id)video;
-- (void)playbackController:(id)controller didActivateVideo:(id)video withPlaybackData:(id)data;
 @end
 
 static NSString *lastVideoID = nil;
 static BOOL lastHasATVOMVPair = NO;
+static NSInteger lastUserContentMode = -1;
 
 static void LogATV(NSString *msg) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
@@ -47,37 +55,27 @@ static void LogATV(NSString *msg) {
     LogATV(@"ForceATV dylib loaded");
 }
 
-%hook YTPlayerViewController
-- (NSString *)contentVideoID {
-    NSString *vid = %orig;
-    if (vid && ![vid isEqualToString:lastVideoID]) {
-        lastVideoID = vid;
-        LogATV([NSString stringWithFormat:@"contentVideoID changed: %@", vid]);
-    }
-    return vid;
-}
-
-- (void)playbackController:(id)controller didActivateNewPlaybackWithContentVideo:(id)video {
-    LogATV(@"didActivateNewPlaybackWithContentVideo");
-    %orig(controller, video);
-}
-
-- (void)playbackController:(id)controller willActivateVideo:(id)video {
-    NSString *vid = [video contentVideoID];
-    LogATV([NSString stringWithFormat:@"willActivateVideo: %@", vid ?: @"(nil)"]);
-    %orig(controller, video);
-}
-%end
-
-%hook YTQueueController
-- (BOOL)initialUserContentModeATVPreferred {
-    LogATV(@"initialUserContentModeATVPreferred called");
-    return YES;
+%hook YTMAVSwitch
+- (void)setUserContentMode:(NSInteger)contentMode {
+    LogATV([NSString stringWithFormat:@"YTMAVSwitch setUserContentMode:%ld (was:%ld)", (long)contentMode, (long)lastUserContentMode]);
+    lastUserContentMode = contentMode;
+    %orig(contentMode);
 }
 
 - (NSInteger)userContentMode {
     NSInteger mode = %orig;
-    LogATV([NSString stringWithFormat:@"userContentMode: %ld", (long)mode]);
+    LogATV([NSString stringWithFormat:@"YTMAVSwitch userContentMode:%ld", (long)mode]);
+    return mode;
+}
+%end
+
+%hook YTQueueController
+- (NSInteger)userContentMode {
+    NSInteger mode = %orig;
+    if (mode != lastUserContentMode) {
+        LogATV([NSString stringWithFormat:@"YTQueueController userContentMode changed to:%ld", (long)mode]);
+        lastUserContentMode = mode;
+    }
     return mode;
 }
 
@@ -95,9 +93,15 @@ static void LogATV(NSString *msg) {
     }
     %orig(value);
 }
+%end
 
-- (void)updateVideoRendererForUserContentMode:(NSInteger)contentMode {
-    LogATV([NSString stringWithFormat:@"updateVideoRendererForUserContentMode:%ld hasATVOMVPair=%d", (long)contentMode, self.hasATVOMVPair]);
-    %orig(contentMode);
+%hook YTPlayerViewController
+- (NSString *)contentVideoID {
+    NSString *vid = %orig;
+    if (vid && ![vid isEqualToString:lastVideoID]) {
+        lastVideoID = vid;
+        LogATV([NSString stringWithFormat:@"contentVideoID changed: %@", vid]);
+    }
+    return vid;
 }
 %end
