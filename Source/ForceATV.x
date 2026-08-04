@@ -62,7 +62,7 @@ static void LogATV(NSString *msg) {
 
 - (id)videoForUserContentModeAtIndex:(NSInteger)index includeAutoplaySection:(BOOL)includeAutoplay {
     id result = %orig(index, includeAutoplay);
-    LogATV([NSString stringWithFormat:@"videoForUserContentModeAtIndex:%ld includeAutoplay:%d -> %@", (long)index, includeAutoplay, result ?: @"(nil)"]);
+    LogATV([NSString stringWithFormat:@"videoForUserContentModeAtIndex:%ld includeAutoplay:%d -> %@", (long)index, includeAutoplay, result ? @"(object)" : @"(nil)"]);
     return result;
 }
 
