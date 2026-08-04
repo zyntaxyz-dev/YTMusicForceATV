@@ -75,9 +75,14 @@ jobs:
           make clean package DEBUG=0 FINALPACKAGE=1
           ls -la packages/
           mkdir -p ../artifacts
-          cp packages/*.deb ../artifacts/ForceATV.deb
-          cp .theos/obj/debug/arm64/ForceATV.dylib ../artifacts/ForceATV.dylib 2>/dev/null || true
-          cp ForceATV.plist ../artifacts/ForceATV.plist 2>/dev/null || true
+          DEB=$(ls packages/*.deb | head -n1)
+          cp "$DEB" ../artifacts/ForceATV.deb
+          mkdir -p extract && tar -xpf "$DEB" -C extract
+          DYLIB=$(find extract -name '*.dylib' | head -n1)
+          PLIST=$(find extract -name '*.plist' | head -n1)
+          cp "$DYLIB" ../artifacts/ForceATV.dylib
+          cp "$PLIST" ../artifacts/ForceATV.plist
+          echo "Artifacts:" && ls -la ../artifacts/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4.6.2
