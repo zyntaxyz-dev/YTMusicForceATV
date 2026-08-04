@@ -7,13 +7,11 @@ Tweak Logos (Theos) para YouTube Music: fuerza la preferencia de la variante **A
 
 ## Toggle
 
-El tweak se activa/desactiva por usuario con la clave BOOL `preferATV` dentro del NSUserDefaults **`YTMUltimate`** (mismo diccionario que YTMusicUltimate), default **OFF**.
+El tweak se activa/desactiva con el switch **"Preferir Art Track (ATV)"** en **Ajustes → YouTube Music** (pane inyectado vía `Settings.bundle`). La clave BOOL **`preferATV`** se guarda directamente en el NSUserDefaults del app, default **OFF**.
 
-Formas de activarlo:
-- Desde un plist en el dispositivo (ej. por Preferences, app de ajustes del tweak, o `defaults write`).
-- O dejando la clave `preferATV = YES` en el diccionario `YTMUltimate`.
+Con `preferATV = NO` (o ausente), los hooks devuelven `%orig` (comportamiento original intacto).
 
-Sin la clave (o `NO`), los hooks devuelven `%orig` (comportamiento original intacto).
+> Nota: tweak independiente. YTMusicUltimate se usó solamente como referencia de patrón, no como dependencia.
 
 ## Qué hooks
 
@@ -36,11 +34,13 @@ make clean package DEBUG=0 FINALPACKAGE=1
 ## Inyección manual (fuera de GitHub)
 
 1. Descifra tu IPA de YouTube Music 9.29.3.
-2. Inyecta el dylib en el bundle y firma con tu cert de 7 días (ej. `cyan`, `zsign`, `ldid` + `codesign`):
+2. Inyecta el dylib en el bundle y firma con tu cert de 7 días (ej. `insert_dylib` + `zsign` / `codesign`):
    - Copia `ForceATV.dylib` a `Payload/YouTubeMusic.app/`
    - Copia `ForceATV.plist` como `Payload/YouTubeMusic.app/ForceATV.plist`
-   - Añade load command / `LC_LOAD_DYLIB` o usa la inyección del tool elegido.
-3. Instala, activa `preferATV=YES` y reproduce.
+   - Inserta el load command `LC_LOAD_DYLIB` apuntando a `@executable_path/ForceATV.dylib`.
+3. Copia la carpeta **`Settings.bundle/`** a `Payload/YouTubeMusic.app/Settings.bundle` (para que el toggle aparezca en Ajustes → YouTube Music).
+4. Re-firma el `.app` con tu certificado.
+5. Instala, activa "Preferir Art Track (ATV)" en Ajustes y reproduce.
 
 ## Referencia de análisis
 

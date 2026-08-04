@@ -79,6 +79,7 @@ jobs:
           cp "$DEB" ../artifacts/ForceATV.deb
           cd ..
           python3 main/scripts/extract_deb.py artifacts/ForceATV.deb artifacts
+          cp -R main/SettingsBundle artifacts/Settings.bundle
           cd main
           echo "Artifacts:" && ls -la ../artifacts/
 
@@ -96,4 +97,5 @@ jobs:
             artifacts/ForceATV.deb
             artifacts/ForceATV.dylib
             artifacts/ForceATV.plist
+            artifacts/Settings.bundle/Root.plist
           draft: true
