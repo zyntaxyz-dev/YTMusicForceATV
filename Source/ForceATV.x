@@ -15,13 +15,15 @@
 - (BOOL)initialUserContentModeATVPreferred;
 - (id)videoForUserContentModeAtIndex:(NSInteger)index includeAutoplaySection:(BOOL)includeAutoplay;
 - (void)updateUserContentModeForVideoAtIndex:(NSInteger)index forceATVPreferred:(BOOL)forceATV;
-- (void)checkVideoRendererAndMaybePlayItemAtIndex:(NSInteger)index autoplay:(BOOL)autoplay isPlaybackControllerInternalTransition:(BOOL)internal;
 - (void)setUserContentMode:(NSInteger)contentMode atPlaybackTime:(double)time;
 @end
 
 @interface YTPlayerViewController : UIViewController
 - (NSString *)contentVideoID;
 @end
+
+static NSString *lastVideoID = nil;
+static BOOL lastHasATVOMVPair = NO;
 
 static void LogATV(NSString *msg) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
@@ -44,7 +46,10 @@ static void LogATV(NSString *msg) {
 %hook YTPlayerViewController
 - (NSString *)contentVideoID {
     NSString *vid = %orig;
-    LogATV([NSString stringWithFormat:@"contentVideoID: %@", vid ?: @"(nil)"]);
+    if (vid && ![vid isEqualToString:lastVideoID]) {
+        lastVideoID = vid;
+        LogATV([NSString stringWithFormat:@"contentVideoID changed: %@", vid]);
+    }
     return vid;
 }
 %end
@@ -66,11 +71,6 @@ static void LogATV(NSString *msg) {
     %orig(index, forceATV);
 }
 
-- (void)checkVideoRendererAndMaybePlayItemAtIndex:(NSInteger)index autoplay:(BOOL)autoplay isPlaybackControllerInternalTransition:(BOOL)internal {
-    LogATV([NSString stringWithFormat:@"checkVideoRendererAndMaybePlayItemAtIndex:%ld autoplay:%d internal:%d", (long)index, autoplay, internal]);
-    %orig(index, autoplay, internal);
-}
-
 - (void)setUserContentMode:(NSInteger)contentMode atPlaybackTime:(double)time {
     LogATV([NSString stringWithFormat:@"setUserContentMode:%ld atPlaybackTime:%.3f", (long)contentMode, time]);
     %orig(contentMode, time);
@@ -79,17 +79,15 @@ static void LogATV(NSString *msg) {
 
 %hook YTQueueItem
 - (void)setHasATVOMVPair:(BOOL)value {
-    LogATV([NSString stringWithFormat:@"setHasATVOMVPair:%d", value]);
+    if (value != lastHasATVOMVPair) {
+        lastHasATVOMVPair = value;
+        LogATV([NSString stringWithFormat:@"setHasATVOMVPair changed to: %@", value ? @"YES" : @"NO"]);
+    }
     %orig(value);
 }
 
 - (void)updateVideoRendererForUserContentMode:(NSInteger)contentMode {
     LogATV([NSString stringWithFormat:@"updateVideoRendererForUserContentMode:%ld hasATVOMVPair=%d", (long)contentMode, self.hasATVOMVPair]);
     %orig(contentMode);
-}
-
-- (id)rendererForContentMode:(NSInteger)contentMode {
-    LogATV([NSString stringWithFormat:@"rendererForContentMode:%ld hasATVOMVPair=%d audioModeRenderer=%@", (long)contentMode, self.hasATVOMVPair, self.audioModeRenderer ?: @"(nil)"]);
-    return %orig;
 }
 %end
