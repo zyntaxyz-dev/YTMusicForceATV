@@ -1,6 +1,18 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
+@interface YTQueueItem : NSObject
+- (BOOL)hasATVOMVPair;
+@property (nonatomic, retain) id audioModeRenderer;
+@property (nonatomic, retain) id videoModeRenderer;
+- (id)rendererForContentMode:(NSInteger)contentMode;
+- (id)watchEndpointForContentMode:(NSInteger)contentMode;
+@end
+
+@interface YTMQueueUpdateCommand : NSObject
+- (NSString *)videoIDOfQueueItem:(id)queueItem userContentMode:(NSInteger)contentMode;
+@end
+
 static void LogATV(NSString *msg) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     NSString *path = [docs stringByAppendingPathComponent:@"ForceATV.log"];
