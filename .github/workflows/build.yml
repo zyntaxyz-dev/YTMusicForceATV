@@ -78,21 +78,7 @@ jobs:
           DEB=$(ls packages/*.deb | head -n1)
           cp "$DEB" ../artifacts/ForceATV.deb
           cd ..
-          python3 - <<'PY'
-import lzma, tarfile, os, glob, shutil
-deb = glob.glob('artifacts/ForceATV.deb')[0]
-extract = 'artifacts/extract'
-os.makedirs(extract, exist_ok=True)
-with tarfile.open(deb, 'r:') as d:
-    d.extractall(extract)
-# uncompress the inner data.tar.lzma
-for f in glob.glob(extract + '/data.tar.*'):
-    mode = 'r:lzma' if f.endswith('.lzma') else 'r:'
-    with tarfile.open(f, mode) as t:
-        t.extractall(extract)
-shutil.copy(glob.glob(extract + '/Library/MobileSubstrate/DynamicLibraries/*.dylib')[0], 'artifacts/ForceATV.dylib')
-shutil.copy(glob.glob(extract + '/Library/MobileSubstrate/DynamicLibraries/*.plist')[0], 'artifacts/ForceATV.plist')
-PY
+          python3 main/scripts/extract_deb.py artifacts/ForceATV.deb artifacts
           cd main
           echo "Artifacts:" && ls -la ../artifacts/
 
