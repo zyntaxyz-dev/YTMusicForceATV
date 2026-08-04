@@ -16,10 +16,14 @@
 - (id)videoForUserContentModeAtIndex:(NSInteger)index includeAutoplaySection:(BOOL)includeAutoplay;
 - (void)updateUserContentModeForVideoAtIndex:(NSInteger)index forceATVPreferred:(BOOL)forceATV;
 - (void)setUserContentMode:(NSInteger)contentMode atPlaybackTime:(double)time;
+- (NSInteger)userContentMode;
 @end
 
 @interface YTPlayerViewController : UIViewController
 - (NSString *)contentVideoID;
+- (void)playbackController:(id)controller didActivateNewPlaybackWithContentVideo:(id)video;
+- (void)playbackController:(id)controller willActivateVideo:(id)video;
+- (void)playbackController:(id)controller didActivateVideo:(id)video withPlaybackData:(id)data;
 @end
 
 static NSString *lastVideoID = nil;
@@ -52,6 +56,17 @@ static void LogATV(NSString *msg) {
     }
     return vid;
 }
+
+- (void)playbackController:(id)controller didActivateNewPlaybackWithContentVideo:(id)video {
+    LogATV(@"didActivateNewPlaybackWithContentVideo");
+    %orig(controller, video);
+}
+
+- (void)playbackController:(id)controller willActivateVideo:(id)video {
+    NSString *vid = [video contentVideoID];
+    LogATV([NSString stringWithFormat:@"willActivateVideo: %@", vid ?: @"(nil)"]);
+    %orig(controller, video);
+}
 %end
 
 %hook YTQueueController
@@ -60,20 +75,15 @@ static void LogATV(NSString *msg) {
     return YES;
 }
 
-- (id)videoForUserContentModeAtIndex:(NSInteger)index includeAutoplaySection:(BOOL)includeAutoplay {
-    id result = %orig(index, includeAutoplay);
-    LogATV([NSString stringWithFormat:@"videoForUserContentModeAtIndex:%ld includeAutoplay:%d -> %@", (long)index, includeAutoplay, result ? @"(object)" : @"(nil)"]);
-    return result;
+- (NSInteger)userContentMode {
+    NSInteger mode = %orig;
+    LogATV([NSString stringWithFormat:@"userContentMode: %ld", (long)mode]);
+    return mode;
 }
 
 - (void)updateUserContentModeForVideoAtIndex:(NSInteger)index forceATVPreferred:(BOOL)forceATV {
     LogATV([NSString stringWithFormat:@"updateUserContentModeForVideoAtIndex:%ld forceATVPreferred:%d", (long)index, forceATV]);
     %orig(index, forceATV);
-}
-
-- (void)setUserContentMode:(NSInteger)contentMode atPlaybackTime:(double)time {
-    LogATV([NSString stringWithFormat:@"setUserContentMode:%ld atPlaybackTime:%.3f", (long)contentMode, time]);
-    %orig(contentMode, time);
 }
 %end
 
