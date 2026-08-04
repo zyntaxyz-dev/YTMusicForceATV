@@ -1,6 +1,22 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
+@interface YTQueueItem : NSObject
+- (BOOL)hasATVOMVPair;
+@property (nonatomic, retain) id audioModeRenderer;
+@property (nonatomic, retain) id videoModeRenderer;
+- (id)rendererForContentMode:(NSInteger)contentMode;
+- (id)watchEndpointForContentMode:(NSInteger)contentMode;
+@end
+
+@interface YTPlayerViewController : UIViewController
+- (NSString *)contentVideoID;
+@end
+
+@interface YTQueueController : NSObject
+- (BOOL)initialUserContentModeATVPreferred;
+@end
+
 static void LogATV(NSString *msg) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     NSString *path = [docs stringByAppendingPathComponent:@"ForceATV.log"];
@@ -38,7 +54,7 @@ static void LogATV(NSString *msg) {
 
 %hook YTQueueItem
 - (id)rendererForContentMode:(NSInteger)contentMode {
-    LogATV([NSString stringWithFormat:@"rendererForContentMode: %ld, hasATVOMVPair=%@", (long)contentMode, self.hasATVOMVPair ? @"YES" : @"NO"]);
+    LogATV([NSString stringWithFormat:@"rendererForContentMode: %ld, hasATVOMVPair=%d", (long)contentMode, self.hasATVOMVPair]);
     return %orig;
 }
 %end
