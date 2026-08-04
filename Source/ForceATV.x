@@ -20,19 +20,36 @@ static void LogATV(NSString *msg) {
 }
 
 // Force ATV (Art Track) over OMV/Visualizer when the pair exists.
-// Default ON. Toggle in-app coming in next phase.
+// Hooks target the actual videoId selection path, not just audio-only flags.
 
-%hook YTDefaultQueueConfig
-- (BOOL)forceATVPreferredWhenPlayAudioOnly {
-    LogATV(@"forceATVPreferredWhenPlayAudioOnly called");
-    return YES;
+%hook YTQueueItem
+- (id)rendererForContentMode:(NSInteger)contentMode {
+    if (self.hasATVOMVPair && self.audioModeRenderer) {
+        LogATV(@"rendererForContentMode: forced ATV");
+        return self.audioModeRenderer;
+    }
+    return %orig;
+}
+
+- (id)watchEndpointForContentMode:(NSInteger)contentMode {
+    if (self.hasATVOMVPair) {
+        id endpoint = %orig(0);
+        if (endpoint) {
+            LogATV(@"watchEndpointForContentMode: forced ATV");
+            return endpoint;
+        }
+    }
+    return %orig;
 }
 %end
 
-%hook YTMQueueConfigImpl
-- (BOOL)forceATVPreferredWhenPlayAudioOnly {
-    LogATV(@"YTMQueueConfigImpl forceATVPreferredWhenPlayAudioOnly called");
-    return YES;
+%hook YTMQueueUpdateCommand
+- (NSString *)videoIDOfQueueItem:(id)queueItem userContentMode:(NSInteger)contentMode {
+    if ([queueItem hasATVOMVPair]) {
+        LogATV(@"videoIDOfQueueItem:userContentMode: forced ATV");
+        return %orig(queueItem, 0);
+    }
+    return %orig;
 }
 %end
 
