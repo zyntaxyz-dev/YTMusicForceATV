@@ -80,7 +80,7 @@ jobs:
           cp ForceATV.plist ../artifacts/ForceATV.plist 2>/dev/null || true
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4.9.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ForceATV
           path: artifacts/
