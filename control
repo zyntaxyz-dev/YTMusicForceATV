@@ -1,0 +1,9 @@
+Package: com.forceatv.ytmusic
+Name: ForceATV
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Prefer ATV (Art Track) over OMV/Visualizer in YouTube Music
+Maintainer: ForceATV
+Author: ForceATV
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000)

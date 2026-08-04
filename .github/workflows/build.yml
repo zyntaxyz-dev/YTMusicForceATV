@@ -1,0 +1,96 @@
+name: Build ForceATV
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version override (optional)"
+        default: "1.0.0"
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ForceATV dylib
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Main
+        uses: actions/checkout@v6.0.2
+        with:
+          path: main
+
+      - name: Install Dependencies
+        run: brew install make ldid
+
+      - name: Set PATH environment variables
+        run: |
+          echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
+          echo "THEOS=${{ github.workspace }}/theos" >> $GITHUB_ENV
+
+      - name: Cache Theos
+        id: theos
+        uses: actions/cache@v5.0.3
+        env:
+          cache-name: theos_cache_forceatv
+        with:
+          path: theos/
+          key: ${{ env.cache-name }}
+          restore-keys: ${{ env.cache-name }}
+
+      - name: Setup Theos
+        if: steps.theos.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: theos/theos
+          ref: 344ee5925df036dbd1312b783ad5a00d153c2445
+          path: theos
+          submodules: recursive
+
+      - name: Download iOS SDK
+        if: steps.theos.outputs.cache-hit != 'true'
+        run: |
+          git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/theos/sdks.git
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          mv *.sdk $THEOS/sdks
+
+      - name: Set Package Version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            sed -i '' "s/PACKAGE_VERSION = .*/PACKAGE_VERSION = ${{ inputs.version }}/" main/Makefile
+            sed -i '' "s/^Version: .*/Version: ${{ inputs.version }}/" main/control
+          fi
+
+      - name: Build Tweak
+        run: |
+          cd main
+          make clean package DEBUG=0 FINALPACKAGE=1
+          ls -la packages/
+          mkdir -p ../artifacts
+          cp packages/*.deb ../artifacts/ForceATV.deb
+          cp .theos/obj/debug/arm64/ForceATV.dylib ../artifacts/ForceATV.dylib 2>/dev/null || true
+          cp ForceATV.plist ../artifacts/ForceATV.plist 2>/dev/null || true
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4.9.0
+        with:
+          name: ForceATV
+          path: artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2.5.0
+        with:
+          name: ForceATV (${{ github.run_number }})
+          files: |
+            artifacts/ForceATV.deb
+            artifacts/ForceATV.dylib
+            artifacts/ForceATV.plist
+          draft: true
