@@ -4,20 +4,11 @@
 @interface YTQueueItem : NSObject
 - (BOOL)hasATVOMVPair;
 - (id)rendererForContentMode:(NSInteger)contentMode;
-- (id)watchEndpointForContentMode:(NSInteger)contentMode;
 @end
 
 @interface YTMQueueUpdateCommand : NSObject
 - (NSString *)videoIDOfQueueItem:(id)queueItem userContentMode:(NSInteger)contentMode;
 @end
-
-@interface YTQueueController : NSObject
-- (NSString *)nowPlayingVideoID;
-- (NSInteger)userContentMode;
-- (void)updateUserContentModeForVideoAtIndex:(NSInteger)index forceATVPreferred:(BOOL)forceATV;
-@end
-
-static NSString *lastVideoID = nil;
 
 static void LogATV(NSString *msg) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
@@ -37,39 +28,25 @@ static void LogATV(NSString *msg) {
     LogATV(@"ForceATV dylib loaded");
 }
 
-%hook YTQueueController
-- (NSString *)nowPlayingVideoID {
-    NSString *vid = %orig;
-    if (vid && ![vid isEqualToString:lastVideoID]) {
-        lastVideoID = vid;
-        LogATV([NSString stringWithFormat:@"nowPlayingVideoID changed: %@", vid]);
-    }
-    return vid;
-}
+// Force ATV (Art Track) over OMV/Visualizer when the pair exists.
+// Content mode: 0 = OMV, 1 = ATV.
+// Hook YTQueueItem -rendererForContentMode: to always return the ATV renderer,
+// regardless of the content mode parameter passed. This bypasses:
+// - forceATVPreferredWhenPlayAudioOnly (only affects audio-only mode)
+// - initialUserContentModeATVPreferred (never called during video playback)
+// - hasATVOMVPair (always 0 in this flow - never set by YTM)
 
-- (void)updateUserContentModeForVideoAtIndex:(NSInteger)index forceATVPreferred:(BOOL)forceATV {
-    LogATV([NSString stringWithFormat:@"updateUserContentModeForVideoAtIndex:%ld forceATVPreferred:%d", (long)index, forceATV]);
-    %orig(index, forceATV);
+%hook YTQueueItem
+- (id)rendererForContentMode:(NSInteger)contentMode {
+    LogATV([NSString stringWithFormat:@"rendererForContentMode:%ld -> forcing ATV (1)", (long)contentMode]);
+    return %orig(1);
 }
 %end
 
 %hook YTMQueueUpdateCommand
 - (NSString *)videoIDOfQueueItem:(id)queueItem userContentMode:(NSInteger)contentMode {
-    NSString *vid = %orig(queueItem, contentMode);
-    LogATV([NSString stringWithFormat:@"videoIDOfQueueItem:userContentMode:%ld -> %@", (long)contentMode, vid ?: @"(nil)"]);
+    NSString *vid = %orig(queueItem, 1);
+    LogATV([NSString stringWithFormat:@"videoIDOfQueueItem:userContentMode:%ld -> forcing ATV (1) = %@", (long)contentMode, vid ?: @"(nil)"]);
     return vid;
-}
-%end
-
-%hook YTQueueItem
-- (id)watchEndpointForContentMode:(NSInteger)contentMode {
-    id endpoint = %orig(contentMode);
-    LogATV([NSString stringWithFormat:@"watchEndpointForContentMode:%ld -> %@", (long)contentMode, endpoint ? @"(endpoint)" : @"(nil)"]);
-    return endpoint;
-}
-
-- (id)rendererForContentMode:(NSInteger)contentMode {
-    LogATV([NSString stringWithFormat:@"rendererForContentMode:%ld hasATVOMVPair=%d", (long)contentMode, self.hasATVOMVPair]);
-    return %orig;
 }
 %end

@@ -7,7 +7,14 @@ Tweak Logos (Theos) para YouTube Music 9.29.3 que fuerza la variante **ATV (Art 
 
 ## Qué hace
 
-Compara y registra qué videoId se usa en cada content mode (0=OMV, 1=ATV) durante la reproducción, para diagnosticar el flujo de selección de videoId.
+Fuerza la reproducción de la variante **ATV (Art Track / audio puro)** sobre OMV (video completo) hookeando los métodos que realmente deciden qué renderer se usa:
+
+| Clase | Método | Efecto con par ATV/OMV |
+|---|---|---|
+| `YTQueueItem` | `rendererForContentMode:` | Ignora content mode, siempre retorna renderer ATV (mode 1) |
+| `YTMQueueUpdateCommand` | `videoIDOfQueueItem:userContentMode:` | Fuerza content mode ATV (1) para el videoId |
+
+**Content mode: 0 = OMV, 1 = ATV.**
 
 ## Build
 
