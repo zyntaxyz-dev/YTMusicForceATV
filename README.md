@@ -1,21 +1,15 @@
 # ForceATV
 
-Tweak Logos (Theos) para YouTube Music: fuerza la preferencia de la variante **ATV (Art Track)** sobre **OMV/Visualizer** cuando existe el par.
+Tweak Logos (Theos) para YouTube Music 9.29.3 que fuerza la variante **ATV (Art Track)** sobre OMV/Visualizer cuando existe el par.
 
 - Target: `com.google.ios.youtubemusic`
-- Build: solo genera el **dylib** (`.deb` + `.dylib` + `.plist`). La inyección a la IPA se hace manualmente.
+- Entrega: solo el **dylib crudo** `ForceATV.dylib`. Inyección manual con esign.
 
-## Toggle
+## Qué hace
 
-El tweak se activa/desactiva con el switch **"Preferir Art Track (ATV)"** en **Ajustes → YouTube Music** (pane inyectado vía `Settings.bundle`). La clave BOOL **`preferATV`** se guarda directamente en el NSUserDefaults del app, default **OFF**.
+Fuerza `YES` en los tres puntos donde YTM decide el modo de contenido del audio:
 
-Con `preferATV = NO` (o ausente), los hooks devuelven `%orig` (comportamiento original intacto).
-
-> Nota: tweak independiente. YTMusicUltimate se usó solamente como referencia de patrón, no como dependencia.
-
-## Qué hooks
-
-| Clase | Método | Efecto con `preferATV=YES` |
+| Clase | Método | Efecto |
 |---|---|---|
 | `YTDefaultQueueConfig` | `forceATVPreferredWhenPlayAudioOnly` | `YES` (config global) |
 | `YTMQueueConfigImpl` | `forceATVPreferredWhenPlayAudioOnly` | `YES` (config impl) |
@@ -23,7 +17,7 @@ Con `preferATV = NO` (o ausente), los hooks devuelven `%orig` (comportamiento or
 
 ## Build
 
-En GitHub Actions (fork): `workflow_dispatch` → genera `ForceATV.deb`, `ForceATV.dylib`, `ForceATV.plist` en la Release/Artifacts. **No se sube IPA a GitHub.**
+En GitHub Actions (fork): `workflow_dispatch` → genera `ForceATV.dylib` (firma limpia, sin entitlements). **No se sube IPA a GitHub.**
 
 Local (Theos):
 
@@ -31,16 +25,26 @@ Local (Theos):
 make clean package DEBUG=0 FINALPACKAGE=1
 ```
 
+El `.dylib` compilado está en `obj/Debug/iphone/ForceATV.dylib`. Se recomienda quitarle la firma antes de inyectar (`ldid -r`).
+
 ## Inyección manual (fuera de GitHub)
 
 1. Descifra tu IPA de YouTube Music 9.29.3.
-2. Inyecta el dylib en el bundle y firma con tu cert de 7 días (ej. `insert_dylib` + `zsign` / `codesign`):
-   - Copia `ForceATV.dylib` a `Payload/YouTubeMusic.app/`
-   - Copia `ForceATV.plist` como `Payload/YouTubeMusic.app/ForceATV.plist`
-   - Inserta el load command `LC_LOAD_DYLIB` apuntando a `@executable_path/ForceATV.dylib`.
-3. Copia la carpeta **`Settings.bundle/`** a `Payload/YouTubeMusic.app/Settings.bundle` (para que el toggle aparezca en Ajustes → YouTube Music).
-4. Re-firma el `.app` con tu certificado.
-5. Instala, activa "Preferir Art Track (ATV)" en Ajustes y reproduce.
+2. Copia `ForceATV.dylib` a `Payload/YouTubeMusic.app/`.
+3. Asegúrate de que el binary principal tiene el load command `LC_LOAD_DYLIB` apuntando a `@executable_path/ForceATV.dylib` (esign lo añade automáticamente al inyectar).
+4. Re-firma el `.app` con tu certificado (esign, zsign, etc.).
+5. Instala, abre YTM y reproduce un álbum con par ATV/OMV (ej. `MPREb_NNmY1n1NJFS` → debe sonar `NBghhjuMNKM`).
+
+## Diagnóstico
+
+Si el tweak no hace nada, conecta el iPhone al PC y revisa:
+
+```
+Apps/com.google.ios.youtubemusic/Documents/ForceATV.log
+```
+
+- **Archivo no existe** → el dylib no se cargó (problema de firma/carga).
+- **Archivo existe** → el dylib se cargó; los hooks se dispararon.
 
 ## Referencia de análisis
 

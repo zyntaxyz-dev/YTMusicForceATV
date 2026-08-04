@@ -3,3 +3,10 @@ packages/
 *.deb
 *.dylib
 .DS_Store
+
+artifacts/
+artifacts_final/
+artifacts_test/
+obj/
+packages/
+

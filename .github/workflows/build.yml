@@ -79,7 +79,7 @@ jobs:
           cp "$DEB" ../artifacts/ForceATV.deb
           cd ..
           python3 main/scripts/extract_deb.py artifacts/ForceATV.deb artifacts
-          cp -R main/SettingsBundle artifacts/Settings.bundle
+          ldid -r artifacts/ForceATV.dylib
           cd main
           echo "Artifacts:" && ls -la ../artifacts/
 
@@ -87,15 +87,12 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
           name: ForceATV
-          path: artifacts/
+          path: artifacts/ForceATV.dylib
 
       - name: Create Release
         uses: softprops/action-gh-release@v2.5.0
         with:
           name: ForceATV (${{ github.run_number }})
           files: |
-            artifacts/ForceATV.deb
             artifacts/ForceATV.dylib
-            artifacts/ForceATV.plist
-            artifacts/Settings.bundle/Root.plist
           draft: true
