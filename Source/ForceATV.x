@@ -1,16 +1,10 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-@interface YTIPlaylistPanelVideoRenderer : NSObject
-- (NSString *)yt_videoID;
-- (NSString *)bindingVideoID;
-- (NSString *)bindingPlaylistID;
-- (NSNumber *)yt_musicVideoType;
-@end
-
-@interface YTQueueItem : NSObject
-- (id)initWithPlaylistPanelVideoRenderer:(id)renderer;
-- (BOOL)hasATVOMVPair;
+@interface YTMWatchViewController : NSObject
+- (NSString *)videoTitle;
+- (NSString *)videoArtist;
+- (NSString *)activeVideoID;
 @end
 
 @interface YTMQueueUpdateCommand : NSObject
@@ -35,23 +29,15 @@ static void LogATV(NSString *msg) {
     LogATV(@"ForceATV dylib loaded");
 }
 
-// DIAGNOSTIC BUILD: determine whether the album's PlaylistPanelVideoRenderer
-// carries a populated bindingVideoID (the ATV counterpart), which decides
-// between a local videoId swap vs a search-based resolver.
+// DIAGNOSTIC BUILD: confirm title/artist + queue videoID are readable at
+// playback time, to design the search-based ATV resolver.
 
-%hook YTQueueItem
-- (id)initWithPlaylistPanelVideoRenderer:(id)renderer {
-    YTIPlaylistPanelVideoRenderer *r = renderer;
-    LogATV([NSString stringWithFormat:@"[init renderer] yt_videoID=%@ | bindingVideoID=%@ | bindingPlaylistID=%@ | musicVideoType=%ld",
-        r.yt_videoID ?: @"(nil)",
-        r.bindingVideoID ?: @"(nil)",
-        r.bindingPlaylistID ?: @"(nil)",
-        (long)r.yt_musicVideoType.integerValue]);
-    return %orig(renderer);
-}
-
-- (BOOL)hasATVOMVPair {
-    return %orig;
+%hook YTMWatchViewController
+- (NSString *)videoTitle {
+    NSString *t = %orig;
+    LogATV([NSString stringWithFormat:@"[watch] videoTitle=%@ | videoArtist=%@ | activeVideoID=%@",
+        t ?: @"(nil)", self.videoArtist ?: @"(nil)", self.activeVideoID ?: @"(nil)"]);
+    return t;
 }
 %end
 
