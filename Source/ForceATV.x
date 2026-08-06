@@ -1,21 +1,24 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-@interface YTClientEndpointBuilderDataModel : NSObject
-- (id)browseId;
-- (id)browseEndpointParams;
+@interface YTIPlaylistPanelVideoRenderer : NSObject
+- (NSString *)yt_videoID;
+- (NSString *)bindingVideoID;
+- (NSString *)bindingPlaylistID;
+- (id)yt_musicVideoType;
 @end
 
-@interface YTBrowseServiceImpl : NSObject
-- (void)makeRequest:(id)request refresh:(BOOL)refresh responseBlock:(id)responseBlock errorBlock:(id)errorBlock;
+@interface YTQueueItem : NSObject
+- (id)rendererForContentMode:(NSInteger)contentMode;
+- (id)videoRenderer;
+- (id)audioModeRenderer;
+- (id)videoModeRenderer;
+- (BOOL)hasATVOMVPair;
 @end
 
-@interface YTMAlbumViewModel : NSObject
-- (id)initWithPlaylistID:(id)playlistID;
-@end
-
-@interface YTMQueueServiceController : NSObject
-- (void)fetchQueueItemsForPlaylistID:(id)playlistID atInsertPosition:(id)insertPosition clickTrackingParams:(id)clickTrackingParams completion:(id)completion;
+@interface YTMMusicShelfSectionController : NSObject
+- (void)handleEntries:(id)entries;
+- (id)shelfRenderer;
 @end
 
 static void LogATV(NSString *msg) {
@@ -32,52 +35,51 @@ static void LogATV(NSString *msg) {
     }
 }
 
+static void LogRenderer(NSString *tag, id renderer) {
+    YTIPlaylistPanelVideoRenderer *r = renderer;
+    if (!r || ![r respondsToSelector:@selector(yt_videoID)]) return;
+    LogATV([NSString stringWithFormat:@"[%s] yt_videoID=%@ | bindingVideoID=%@ | bindingPlaylistID=%@ | mvt=%ld",
+        tag.UTF8String,
+        [r yt_videoID] ?: @"(nil)",
+        [r bindingVideoID] ?: @"(nil)",
+        [r bindingPlaylistID] ?: @"(nil)",
+        (long)[(NSNumber *)[r yt_musicVideoType] integerValue]]);
+}
+
 %ctor {
     LogATV(@"ForceATV dylib loaded");
 }
 
-// DIAGNOSTIC BUILD (album-level): determine which browseId/params the iOS app
-// actually sends when opening an album, and which playlistID drives the queue.
+// DIAGNOSTIC BUILD: verify whether the album's PlaylistPanelVideoRenderer carries
+// a populated bindingVideoID (ATV) at the point where the response is parsed
+// (handleEntries) and at the queue-item renderer point (rendererForContentMode).
 
-%hook YTClientEndpointBuilderDataModel
-- (id)browseId {
-    id v = %orig;
-    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 3) {
-        LogATV([NSString stringWithFormat:@"[endpoint] browseId=%@", v]);
-    }
+%hook YTMMusicShelfSectionController
+- (void)handleEntries:(id)entries {
+    LogATV([NSString stringWithFormat:@"[shelf] handleEntries: class=%@ count=%lu",
+        NSStringFromClass([entries class]), (unsigned long)[entries count]]);
+    @try {
+        id shelf = self.shelfRenderer;
+        LogATV([NSString stringWithFormat:@"[shelf] shelfRenderer=%@", NSStringFromClass([shelf class])]);
+    } @catch (...) {}
+    return %orig(entries);
+}
+%end
+
+%hook YTQueueItem
+- (id)rendererForContentMode:(NSInteger)contentMode {
+    id r = %orig(contentMode);
+    LogATV([NSString stringWithFormat:@"[queueItem] rendererForContentMode:%ld -> %@", (long)contentMode, NSStringFromClass([r class])]);
+    LogRenderer(@"rendererForContentMode", r);
+    LogRenderer(@"videoRenderer", self.videoRenderer);
+    LogRenderer(@"audioModeRenderer", self.audioModeRenderer);
+    LogRenderer(@"videoModeRenderer", self.videoModeRenderer);
+    return r;
+}
+
+- (BOOL)hasATVOMVPair {
+    BOOL v = %orig;
+    if (v) LogATV(@"[queueItem] hasATVOMVPair=YES");
     return v;
-}
-
-- (id)browseEndpointParams {
-    id v = %orig;
-    LogATV([NSString stringWithFormat:@"[endpoint] browseEndpointParams=%@", v ?: @"(nil)"]);
-    return v;
-}
-%end
-
-%hook YTBrowseServiceImpl
-- (void)makeRequest:(id)request refresh:(BOOL)refresh responseBlock:(id)responseBlock errorBlock:(id)errorBlock {
-    NSString *reqClass = NSStringFromClass([request class]);
-    NSString *browseId = @"(n/a)";
-    if ([request respondsToSelector:@selector(browseId)]) {
-        id b = [request browseId];
-        browseId = [b isKindOfClass:[NSString class]] ? b : @"(obj)";
-    }
-    LogATV([NSString stringWithFormat:@"[browseReq] class=%@ browseId=%@", reqClass, browseId]);
-    return %orig(request, refresh, responseBlock, errorBlock);
-}
-%end
-
-%hook YTMAlbumViewModel
-- (id)initWithPlaylistID:(id)playlistID {
-    LogATV([NSString stringWithFormat:@"[albumVM] initWithPlaylistID=%@", playlistID ?: @"(nil)"]);
-    return %orig(playlistID);
-}
-%end
-
-%hook YTMQueueServiceController
-- (void)fetchQueueItemsForPlaylistID:(id)playlistID atInsertPosition:(id)insertPosition clickTrackingParams:(id)clickTrackingParams completion:(id)completion {
-    LogATV([NSString stringWithFormat:@"[queue] fetchQueueItemsForPlaylistID=%@", playlistID ?: @"(nil)"]);
-    return %orig(playlistID, insertPosition, clickTrackingParams, completion);
 }
 %end
