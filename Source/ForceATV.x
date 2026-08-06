@@ -1,14 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-@interface YTIBrowseRequest : NSObject
-- (id)ytm_navigationEndpoint;
-- (void)ytm_setNavigationEndpoint:(id)endpoint;
-@end
-
-@interface YTMutableClientEndpointBuilderDataModel : NSObject
-- (void)setBrowseId:(id)browseId;
-- (void)setBrowseEndpointParams:(id)params;
+@interface YTMWatchViewController : NSObject
+- (void)setVideoTitle:(NSString *)videoTitle videoArtist:(NSString *)videoArtist;
+- (NSString *)activeVideoID;
 @end
 
 static void LogATV(NSString *msg) {
@@ -29,45 +24,25 @@ static void LogATV(NSString *msg) {
     LogATV(@"ForceATV dylib loaded");
 }
 
-// DIAGNOSTIC BUILD: confirm where the album browseId lives and what value
-// (MPREb vs OLAK) iOS sends, using real selectors (no invented KVC keys).
+// DIAGNOSTIC BUILD: confirm title/artist arrive at setVideoTitle:videoArtist:
+// (data needed for the search-based ATV resolver) and activeVideoID at that point.
 
-%hook YTIBrowseRequest
-- (id)ytm_navigationEndpoint {
-    id e = %orig;
+%hook YTMWatchViewController
+- (void)setVideoTitle:(NSString *)videoTitle videoArtist:(NSString *)videoArtist {
     @try {
-        LogATV([NSString stringWithFormat:@"[nav] endpoint=%@", NSStringFromClass([e class])]);
-        @try {
-            id b = [e valueForKey:@"browseId"];
-            if (b) LogATV([NSString stringWithFormat:@"  endpoint.browseId=%@", b]);
-        } @catch (NSException *x) {
-            LogATV([NSString stringWithFormat:@"  endpoint.browseId exc: %@", x.name]);
-        }
-    } @catch (NSException *x) {
-        LogATV([NSString stringWithFormat:@"[nav] exc: %@", x.name]);
+        LogATV([NSString stringWithFormat:@"[setTitle] title=%@ | artist=%@ | activeVideoID=%@",
+            videoTitle ?: @"(nil)",
+            videoArtist ?: @"(nil)",
+            self.activeVideoID ?: @"(nil)"]);
+    } @catch (NSException *e) {
+        LogATV([NSString stringWithFormat:@"[setTitle] exc: %@", e.reason]);
     }
-    return e;
+    return %orig(videoTitle, videoArtist);
 }
 
-- (void)ytm_setNavigationEndpoint:(id)endpoint {
-    @try {
-        LogATV([NSString stringWithFormat:@"[setNav] endpoint=%@", NSStringFromClass([endpoint class])]);
-        @try {
-            id b = [endpoint valueForKey:@"browseId"];
-            if (b) LogATV([NSString stringWithFormat:@"  setNav.browseId=%@", b]);
-        } @catch (NSException *x) {
-            LogATV([NSString stringWithFormat:@"  setNav.browseId exc: %@", x.name]);
-        }
-    } @catch (NSException *x) {
-        LogATV([NSString stringWithFormat:@"[setNav] exc: %@", x.name]);
-    }
-    return %orig(endpoint);
-}
-%end
-
-%hook YTMutableClientEndpointBuilderDataModel
-- (void)setBrowseId:(id)browseId {
-    LogATV([NSString stringWithFormat:@"[setBrowseId] %@", browseId ?: @"(nil)"]);
-    return %orig(browseId);
+- (NSString *)activeVideoID {
+    NSString *v = %orig;
+    LogATV([NSString stringWithFormat:@"[activeVideoID] %@", v ?: @"(nil)"]);
+    return v;
 }
 %end
