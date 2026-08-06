@@ -1,8 +1,14 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-@interface YTBrowseServiceImpl : NSObject
-- (void)makeRequest:(id)request refresh:(BOOL)refresh responseBlock:(id)responseBlock errorBlock:(id)errorBlock;
+@interface YTIBrowseRequest : NSObject
+- (id)ytm_navigationEndpoint;
+- (void)ytm_setNavigationEndpoint:(id)endpoint;
+@end
+
+@interface YTMutableClientEndpointBuilderDataModel : NSObject
+- (void)setBrowseId:(id)browseId;
+- (void)setBrowseEndpointParams:(id)params;
 @end
 
 static void LogATV(NSString *msg) {
@@ -23,34 +29,45 @@ static void LogATV(NSString *msg) {
     LogATV(@"ForceATV dylib loaded");
 }
 
-// DIAGNOSTIC BUILD: discover the real browseId/playlistId that iOS sends when
-// opening an album, via defensive KVC on the browse request and its
-// navigationEndpoint. Goal: confirm whether the request carries MPREb or OLAK,
-// to design the browseId swap (Fase 2).
+// DIAGNOSTIC BUILD: confirm where the album browseId lives and what value
+// (MPREb vs OLAK) iOS sends, using real selectors (no invented KVC keys).
 
-%hook YTBrowseServiceImpl
-- (void)makeRequest:(id)request refresh:(BOOL)refresh responseBlock:(id)responseBlock errorBlock:(id)errorBlock {
+%hook YTIBrowseRequest
+- (id)ytm_navigationEndpoint {
+    id e = %orig;
     @try {
-        LogATV([NSString stringWithFormat:@"[browseReq] class=%@", NSStringFromClass([request class])]);
-        id nav = [request valueForKey:@"navigationEndpoint"];
-        if (nav) {
-            LogATV([NSString stringWithFormat:@"  navEndpoint=%@", NSStringFromClass([nav class])]);
-            for (NSString *k in @[@"browseId", @"browseEndpointId", @"playlistId", @"watchPlaylistId", @"browseEndpoint", @"watchEndpoint"]) {
-                @try {
-                    id v = [nav valueForKey:k];
-                    if (v) LogATV([NSString stringWithFormat:@"  nav[%@]=%@", k, v]);
-                } @catch (...) {}
-            }
+        LogATV([NSString stringWithFormat:@"[nav] endpoint=%@", NSStringFromClass([e class])]);
+        @try {
+            id b = [e valueForKey:@"browseId"];
+            if (b) LogATV([NSString stringWithFormat:@"  endpoint.browseId=%@", b]);
+        } @catch (NSException *x) {
+            LogATV([NSString stringWithFormat:@"  endpoint.browseId exc: %@", x.name]);
         }
-        for (NSString *k in @[@"browseId", @"playlistId", @"watchPlaylistId"]) {
-            @try {
-                id v = [request valueForKey:k];
-                if (v) LogATV([NSString stringWithFormat:@"  req[%@]=%@", k, v]);
-            } @catch (...) {}
-        }
-    } @catch (NSException *e) {
-        LogATV([NSString stringWithFormat:@"[browseReq] exc: %@", e.reason]);
+    } @catch (NSException *x) {
+        LogATV([NSString stringWithFormat:@"[nav] exc: %@", x.name]);
     }
-    return %orig(request, refresh, responseBlock, errorBlock);
+    return e;
+}
+
+- (void)ytm_setNavigationEndpoint:(id)endpoint {
+    @try {
+        LogATV([NSString stringWithFormat:@"[setNav] endpoint=%@", NSStringFromClass([endpoint class])]);
+        @try {
+            id b = [endpoint valueForKey:@"browseId"];
+            if (b) LogATV([NSString stringWithFormat:@"  setNav.browseId=%@", b]);
+        } @catch (NSException *x) {
+            LogATV([NSString stringWithFormat:@"  setNav.browseId exc: %@", x.name]);
+        }
+    } @catch (NSException *x) {
+        LogATV([NSString stringWithFormat:@"[setNav] exc: %@", x.name]);
+    }
+    return %orig(endpoint);
+}
+%end
+
+%hook YTMutableClientEndpointBuilderDataModel
+- (void)setBrowseId:(id)browseId {
+    LogATV([NSString stringWithFormat:@"[setBrowseId] %@", browseId ?: @"(nil)"]);
+    return %orig(browseId);
 }
 %end
