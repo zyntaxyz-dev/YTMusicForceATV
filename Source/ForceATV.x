@@ -1,9 +1,8 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-@interface YTQueueItem : NSObject
-- (id)rendererForContentMode:(NSInteger)contentMode;
-- (id)videoRenderer;
+@interface YTBrowseServiceImpl : NSObject
+- (void)makeRequest:(id)request refresh:(BOOL)refresh responseBlock:(id)responseBlock errorBlock:(id)errorBlock;
 @end
 
 static void LogATV(NSString *msg) {
@@ -20,39 +19,38 @@ static void LogATV(NSString *msg) {
     }
 }
 
-static NSString *KVC(NSString *tag, id obj) {
-    if (!obj) return @"(obj nil)";
-    id v = nil;
-    @try { v = [obj valueForKey:tag]; }
-    @catch (NSException *e) { return @"(err)"; }
-    return [v isKindOfClass:[NSString class]] ? v : (v ? [NSString stringWithFormat:@"(nonstr %@)", NSStringFromClass([v class])] : @"(nil)");
-}
-
 %ctor {
     LogATV(@"ForceATV dylib loaded");
 }
 
-// DIAGNOSTIC BUILD (defensive): read yt_videoID/bindingVideoID from the queue
-// item renderer via KVC inside @try, to avoid crashing. Goal: verify whether
-// the album's PlaylistPanelVideoRenderer carries a populated bindingVideoID (ATV).
+// DIAGNOSTIC BUILD: discover the real browseId/playlistId that iOS sends when
+// opening an album, via defensive KVC on the browse request and its
+// navigationEndpoint. Goal: confirm whether the request carries MPREb or OLAK,
+// to design the browseId swap (Fase 2).
 
-%hook YTQueueItem
-- (id)rendererForContentMode:(NSInteger)contentMode {
-    id r = %orig(contentMode);
+%hook YTBrowseServiceImpl
+- (void)makeRequest:(id)request refresh:(BOOL)refresh responseBlock:(id)responseBlock errorBlock:(id)errorBlock {
     @try {
-        LogATV([NSString stringWithFormat:@"[qi] rcm:%ld -> %@ | yt_videoID=%@ | bindingVideoID=%@",
-            (long)contentMode,
-            NSStringFromClass([r class]),
-            KVC(@"yt_videoID", r),
-            KVC(@"bindingVideoID", r)]);
-        id vr = [self valueForKey:@"videoRenderer"];
-        LogATV([NSString stringWithFormat:@"[qi] videoRenderer=%@ | yt_videoID=%@ | bindingVideoID=%@",
-            NSStringFromClass([vr class]),
-            KVC(@"yt_videoID", vr),
-            KVC(@"bindingVideoID", vr)]);
+        LogATV([NSString stringWithFormat:@"[browseReq] class=%@", NSStringFromClass([request class])]);
+        id nav = [request valueForKey:@"navigationEndpoint"];
+        if (nav) {
+            LogATV([NSString stringWithFormat:@"  navEndpoint=%@", NSStringFromClass([nav class])]);
+            for (NSString *k in @[@"browseId", @"browseEndpointId", @"playlistId", @"watchPlaylistId", @"browseEndpoint", @"watchEndpoint"]) {
+                @try {
+                    id v = [nav valueForKey:k];
+                    if (v) LogATV([NSString stringWithFormat:@"  nav[%@]=%@", k, v]);
+                } @catch (...) {}
+            }
+        }
+        for (NSString *k in @[@"browseId", @"playlistId", @"watchPlaylistId"]) {
+            @try {
+                id v = [request valueForKey:k];
+                if (v) LogATV([NSString stringWithFormat:@"  req[%@]=%@", k, v]);
+            } @catch (...) {}
+        }
     } @catch (NSException *e) {
-        LogATV([NSString stringWithFormat:@"[qi] exception: %@", e.reason]);
+        LogATV([NSString stringWithFormat:@"[browseReq] exc: %@", e.reason]);
     }
-    return r;
+    return %orig(request, refresh, responseBlock, errorBlock);
 }
 %end
